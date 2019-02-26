@@ -53,7 +53,8 @@ endif
 
 Cap5_SRCS = Cap5.xs
 Cap5_LIBS = ca Com
-Cap5_INCLUDES = -I$(shell $(PERL) ../perlConfig.pl archlib)/CORE
+Cap5_INCLUDES = -I$(shell $(PERL) ../perlConfig.pl archlib)/CORE \
+-I/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/System/Library/Perl/5.18/darwin-thread-multi-2level/CORE
 Cap5_CFLAGS = $(shell $(PERL) ../perlConfig.pl ccflags)
 
 CLEANS += Cap5.c
