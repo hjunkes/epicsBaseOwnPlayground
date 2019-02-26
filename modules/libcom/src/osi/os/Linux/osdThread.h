@@ -24,7 +24,6 @@ typedef struct epicsThreadOSD {
     ELLNODE            node;
     pthread_t          tid;
     pid_t              lwpId;
-    pthread_attr_t     attr;
     struct sched_param schedParam;
     int                schedPolicy;
     EPICSTHREADFUNC    createFunc;
@@ -32,7 +31,6 @@ typedef struct epicsThreadOSD {
     epicsEventId       suspendEvent;
     int                isSuspended;
     int                isEpicsThread;
-    int                isRealTimeScheduled;
     int                isOnThreadList;
     unsigned int       osiPriority;
     char               name[1];     /* actually larger */
