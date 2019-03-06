@@ -290,9 +290,9 @@ testHarness_SRCS += cvtFastPerform.cpp
 
 TESTPROD_HOST += nonEpicsThreadPriorityTest
 nonEpicsThreadPriorityTest_SRCS += nonEpicsThreadPriorityTest.cpp
-nonEpicsThreadPriorityTest_SRCS_RTEMS += nonEpicsThreadPriorityTest.cpp
 #nonEpicsThreadPriorityTest_LIBS += Com
 #nonEpicsThreadPriorityTest_SYS_LIBS += pthread rt
+testHarness_SRCS += nonEpicsThreadPriorityTest.cpp 
 TESTS += nonEpicsThreadPriorityTest
 
 include $(TOP)/configure/RULES

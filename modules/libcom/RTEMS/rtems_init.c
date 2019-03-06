@@ -18,7 +18,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <unistd.h>
-#include <sys/termios.h>
+#include <termios.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/socket.h>
@@ -30,7 +30,16 @@
 #include <rtems/stackchk.h>
 #include <rtems/rtems_bsdnet.h>
 #include <rtems/imfs.h>
+
 #include <librtemsNfs.h>
+#if __RTEMS_MAJOR__>4
+#include <pthread.h>
+#include <signal.h>
+#include <sched.h>
+#include <rtems/libio.h>
+#include <sys/stat.h>
+#endif
+
 #include <bsp.h>
 
 #include "epicsVersion.h"
@@ -83,9 +92,14 @@ logReset (void)
 static void
 delayedPanic (const char *msg)
 {
+#if __RTEMS_MAJOR__>4
+    rtems_task_wake_after (rtems_clock_get_ticks_per_second());
+    rtems_task_wake_after (rtems_clock_get_ticks_per_second());
+#else
     extern rtems_interval rtemsTicksPerSecond;
 
     rtems_task_wake_after (rtemsTicksPerSecond);
+#endif
     rtems_panic (msg);
 }
 
@@ -218,6 +232,13 @@ nfsMount(char *uidhost, char *path, char *mntpoint)
     }
     sprintf(dev, "%s:%s", uidhost, path);
     printf("Mount %s on %s\n", dev, mntpoint);
+#if __RTEMS_MAJOR__>4
+   rval = mount_and_make_target_path (
+        dev, mntpoint, RTEMS_FILESYSTEM_TYPE_NFS,
+        RTEMS_FILESYSTEM_READ_WRITE, NULL );
+   if(rval)
+      perror("mount failed");
+#else
     if (rtems_mkdir(mntpoint, S_IRWXU | S_IRWXG | S_IRWXO))
         printf("Warning -- unable to make directory \"%s\"\n", mntpoint);
     if (mount(dev, mntpoint, RTEMS_FILESYSTEM_TYPE_NFS,
@@ -227,6 +248,7 @@ nfsMount(char *uidhost, char *path, char *mntpoint)
     else {
         rval = 0;
     }
+#endif
     free(dev);
     return rval;
 }
@@ -235,6 +257,7 @@ nfsMount(char *uidhost, char *path, char *mntpoint)
 #define NFS_INIT    rpcUdpInit(); nfsInit(0,0);
 #endif
 #endif
+
 
 static void
 initialize_remote_filesystem(char **argv, int hasLocalFilesystem)
@@ -343,7 +366,8 @@ initialize_remote_filesystem(char **argv, int hasLocalFilesystem)
                 if ( scanfStatus ==  2 ) {
                     pServerPath[0u]= '/';
                     server_name = pServerName;
-                    server_path = pServerPath;
+                    // is this a general solution?
+                    server_path = mount_point = pServerPath;
                 }
                 else {
                     free ( pServerName );
@@ -475,11 +499,20 @@ static void netStatCallFunc(const iocshArgBuf *args)
 static const iocshFuncDef heapSpaceFuncDef = {"heapSpace",0,NULL};
 static void heapSpaceCallFunc(const iocshArgBuf *args)
 {
+#if __RTEMS_MAJOR__>4
+    Heap_Information_block info;
+    double x;
+
+    malloc_info (&info);
+    x = info.Stats.size - (unsigned long)
+        (info.Stats.lifetime_allocated - info.Stats.lifetime_freed);
+#else
     rtems_malloc_statistics_t s;
     double x;
 
     malloc_get_statistics(&s);
     x = s.space_available - (unsigned long)(s.lifetime_allocated - s.lifetime_freed);
+#endif
     if (x >= 1024*1024)
         printf("Heap space: %.1f MB\n", x / (1024 * 1024));
     else
@@ -560,6 +593,7 @@ initConsole (void)
     }
 }
 
+#if __RTEMS_MAJOR__<5
 /*
  * Ensure that the configuration object files
  * get pulled in from the library
@@ -570,7 +604,7 @@ const void *rtemsConfigArray[] = {
     &Configuration,
     &rtems_bsdnet_config
 };
-
+#endif
 /*
  * Hook to ensure that BSP cleanup code gets run on exit
  */
@@ -583,13 +617,20 @@ exitHandler(void)
 /*
  * RTEMS Startup task
  */
+#if __RTEMS_MAJOR__>4
+void *
+POSIX_Init (void *argument)
+#else
 rtems_task
 Init (rtems_task_argument ignored)
-{
+#endif
+  {
     int                 result;
     char               *argv[3]         = { NULL, NULL, NULL };
     char               *cp;
+#if __RTEMS_MAJOR__<5
     rtems_task_priority newpri;
+#endif
     rtems_status_code   sc;
     rtems_time_of_day   now;
 
@@ -610,13 +651,21 @@ Init (rtems_task_argument ignored)
     if (epicsRtemsInitPostSetBootConfigFromNVRAM(&rtems_bsdnet_config) != 0)
         delayedPanic("epicsRtemsInitPostSetBootConfigFromNVRAM");
 
+#if __RTEMS_MAJOR__>4
+
     /*
+     * Override RTEMS Posix configuration, starts with posix prio 2
+     */
+    epicsThreadSetPriority(epicsThreadGetIdSelf(), epicsThreadPriorityIocsh);
+#else
+     /*
      * Override RTEMS configuration
      */
     rtems_task_set_priority (
-                     RTEMS_SELF,
-                     epicsThreadGetOssPriorityValue(epicsThreadPriorityIocsh),
-                     &newpri);
+      RTEMS_SELF,
+      epicsThreadGetOssPriorityValue(epicsThreadPriorityIocsh),
+      &newpri);
+#endif
 
     /*
      * Create a reasonable environment
@@ -642,10 +691,14 @@ Init (rtems_task_argument ignored)
         if (epicsThreadHighestPriorityLevelBelow(epicsThreadPriorityScanLow, &p)
                                             == epicsThreadBooleanStatusSuccess)
         {
+#if __RTEMS_MAJOR__>4
+            rtems_bsdnet_config.network_task_priority = 255 - p; //it's the RTEMS prio, check check ...
+#else
             rtems_bsdnet_config.network_task_priority = epicsThreadGetOssPriorityValue(p);
+#endif
         }
     }
-    printf("\n***** Initializing network *****\n");
+    printf("\n***** Initializing network (network_task_priority = %lu) *****\n", rtems_bsdnet_config.network_task_priority );
     rtems_bsdnet_initialize_network();
     printf("\n***** Setting up file system *****\n");
     initialize_remote_filesystem(argv, initialize_local_filesystem(argv));
@@ -668,7 +721,11 @@ Init (rtems_task_argument ignored)
      * It is very likely that other time synchronization facilities in EPICS
      * will soon override this value.
      */
+#if __RTEMS_MAJOR__>4
+    if (rtems_clock_get_tod(&now) != RTEMS_SUCCESSFUL) {
+#else
     if (rtems_clock_get(RTEMS_CLOCK_GET_TOD,&now) != RTEMS_SUCCESSFUL) {
+#endif
         now.year = 2001;
         now.month = 1;
         now.day = 1;
@@ -701,7 +758,12 @@ Init (rtems_task_argument ignored)
         }
     }
     tzset();
+#if __RTEMS_MAJOR__>4
+    printf(" check for time registered , C++ initialization ...\n");
+    // timeRegister();
+#else
     osdTimeRegister();
+#endif
 
     /*
      * Run the EPICS startup script
@@ -717,6 +779,9 @@ Init (rtems_task_argument ignored)
     printf ("***** IOC application terminating *****\n");
     epicsThreadSleep(1.0);
     epicsExit(result);
+#if __RTEMS_MAJOR__>4
+    return NULL;
+#endif
 }
 
 #if defined(QEMU_FIXUPS)
@@ -728,10 +793,17 @@ Init (rtems_task_argument ignored)
 /* Ensure that stdio goes to serial (so it can be captured) */
 #if defined(__i386__) && !USE_COM1_AS_CONSOLE
 #include <uart.h>
+#if __RTEMS_MAJOR__>4
+#include <libchip/serial.h>
+#endif
 extern int BSPPrintkPort;
 void bsp_predriver_hook(void)
 {
+#if __RTEMS_MAJOR__>4
+    Console_Port_Minor = BSP_CONSOLE_PORT_COM1;
+#else
     BSPConsolePort = BSP_CONSOLE_PORT_COM1;
+#endif
     BSPPrintkPort = BSP_CONSOLE_PORT_COM1;
 }
 #endif

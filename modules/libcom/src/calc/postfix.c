@@ -27,6 +27,10 @@
 #include "postfixPvt.h"
 #include "shareLib.h"
 
+#ifdef RTEMS_HAS_ALTIVEC
+#pragma GCC push_options
+#pragma GCC optimize ("O0")
+#endif
 
 /* declarations for postfix */
 
@@ -624,3 +628,7 @@ epicsShareFunc void
 	}
     }
 }
+
+#ifdef RTEMS_HAS_ALTIVEC
+#pragma GCC pop_options
+#endif

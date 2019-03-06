@@ -95,15 +95,29 @@ MODEXT=.obj
 OS_CLASS = RTEMS
 
 #--------------------------------------------------
+# operating system API (src/os/<os_class>-<os-api>)
+OS_API_4.7 = kernel
+OS_API_4.8 = kernel
+OS_API_4.9 = kernel
+OS_API_4.10 = kernel
+OS_API_4.11 = $(error RTEMS-4-11 is not currently supported)
+# Later RTEMS versions will use posix, no need to specify
+OS_API = $(firstword $(OS_API_$(RTEMS_SERIES)) posix)
+
+#--------------------------------------------------
 # Operating system flags
-OP_SYS_LDLIBS += -lrtemsCom -lc -lrtemscpu -lCom -lnfs -lm
-OP_SYS_LDFLAGS += $(CPU_CFLAGS) -u Init \
+OP_SYS_LDLIBS += -lrtemsCom -lc -lrtemscpu -lCom -lnfs -lm 
+# newest Rtems > 2019 needs this -ltftpfs
+
+OP_SYS_LDFLAGS_posix += -u POSIX_Init
+OP_SYS_LDFLAGS_kernel += $(CPU_CFLAGS) -u Init \
                  $(PROJECT_RELEASE)/lib/no-dpmem.rel \
                  $(PROJECT_RELEASE)/lib/no-mp.rel \
                  $(PROJECT_RELEASE)/lib/no-part.rel \
                  $(PROJECT_RELEASE)/lib/no-signal.rel \
                  $(PROJECT_RELEASE)/lib/no-rtmon.rel
 
+OP_SYS_LDFLAGS += $(CPU_FLAGS) $(OP_SYS_LDFLAGS_$(OS_API))
 MOD_SYS_LDFLAGS += $(CPU_CFLAGS) -Wl,-r -nostdlib
 
 # Do not link against libraries which are part of the Generic Image

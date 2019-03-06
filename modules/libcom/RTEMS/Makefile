@@ -11,6 +11,9 @@ TOP = ..
 include $(TOP)/configure/CONFIG
 include $(TOP)/configure/CONFIG_LIBCOM_VERSION
 
+# check check
+SRC_DIRS += ../$(OS_API)
+
 PERL_SCRIPTS += epicsMakeMemFs.pl
 
 INC += epicsRtemsInitHooks.h

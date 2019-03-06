@@ -7,34 +7,21 @@
 * and higher are distributed subject to a Software License Agreement found
 * in file LICENSE that is included with this distribution. 
 \*************************************************************************/
+#include <rtems.h>
+#include <rtems/malloc.h>
+#include <rtems/score/heap.h>
+#define epicsExportSharedSymbols
+#include "osiPoolStatus.h"
 
 /*
- * Author: Jeff Hill
+ * osiSufficentSpaceInPool ()
  */
+epicsShareFunc int epicsShareAPI osiSufficentSpaceInPool ( size_t contiguousBlockSize )
+{
+    unsigned long n;
+    Heap_Information_block info;
 
-#ifndef osdTimeh
-#define osdTimeh
-
-#include <unistd.h>
-#include "shareLib.h"
-
-#if !defined(_POSIX_TIMERS) || _POSIX_TIMERS < 0
-	struct timespec {
-		time_t tv_sec; /* seconds since some epoch */
-		long tv_nsec; /* nanoseconds within the second */
-	};
-#endif /* !_POSIX_TIMERS */
-
-#ifdef __cplusplus
-extern "C" {
-#endif /* __cplusplus */
-
-epicsShareFunc void epicsShareAPI
-    convertDoubleToWakeTime(double timeout,struct timespec *wakeTime);
-
-#ifdef __cplusplus
+    malloc_info( &info );
+    n = info.Stats.size - (unsigned long)(info.Stats.lifetime_allocated - info.Stats.lifetime_freed);
+    return (n > (50000 + contiguousBlockSize));
 }
-#endif /* __cplusplus */
-
-#endif /* ifndef osdTimeh */
-
