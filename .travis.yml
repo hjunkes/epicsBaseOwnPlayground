@@ -15,13 +15,13 @@ addons:
 script:
   - .ci/travis-build.sh
 env:
-#  - CMPLR=gcc
-#  - CMPLR=clang
+  - CMPLR=gcc
+  - CMPLR=clang
   - CMPLR=gcc   STATIC=YES
-#  - CMPLR=clang STATIC=YES
-#  - CMPLR=gcc   EXTRA=CMD_CXXFLAGS=-std=c++11
-#  - CMPLR=clang EXTRA=CMD_CXXFLAGS=-std=c++11
-#  - WINE=32 TEST=NO STATIC=YES
-#  - WINE=32 TEST=NO STATIC=NO
+  - CMPLR=clang STATIC=YES
+  - CMPLR=gcc   EXTRA=CMD_CXXFLAGS=-std=c++11
+  - CMPLR=clang EXTRA=CMD_CXXFLAGS=-std=c++11
+  - WINE=32 TEST=NO STATIC=YES
+  - WINE=32 TEST=NO STATIC=NO
   - RTEMS=4.10 TEST=YES
   - RTEMS=4.9  TEST=YES
