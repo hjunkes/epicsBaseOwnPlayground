@@ -17,7 +17,7 @@ script:
 env:
 #  - CMPLR=gcc
 #  - CMPLR=clang
-#  - CMPLR=gcc   STATIC=YES
+  - CMPLR=gcc   STATIC=YES
 #  - CMPLR=clang STATIC=YES
 #  - CMPLR=gcc   EXTRA=CMD_CXXFLAGS=-std=c++11
 #  - CMPLR=clang EXTRA=CMD_CXXFLAGS=-std=c++11
