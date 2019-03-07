@@ -57,7 +57,7 @@ then
   sed -i -e '/^RTEMS_VERSION/d' -e '/^RTEMS_SERIES/d' -e '/^RTEMS_BASE/d' configure/os/CONFIG_SITE.Common.RTEMS
   cat << EOF >> configure/os/CONFIG_SITE.Common.RTEMS
 RTEMS_VERSION=$RTEMS
-RTEMS_SERIES="${RTEMS%.*}"
+RTEMS_SERIES=$RTEMS
 RTEMS_BASE=$HOME/.rtems
 EOF
   cat << EOF >> configure/CONFIG_SITE
