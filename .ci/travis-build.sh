@@ -61,8 +61,6 @@ RTEMS_SERIES=$RTEMS
 RTEMS_BASE=$HOME/.rtems
 EOF
 
-  tail configure/os/CONFIG_SITE.Common.RTEMS
-
   cat << EOF >> configure/CONFIG_SITE
 CROSS_COMPILER_TARGET_ARCHS += RTEMS-pc386-qemu
 EOF
