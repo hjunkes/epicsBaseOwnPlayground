@@ -37,7 +37,6 @@
 #include <signal.h>
 #include <sched.h>
 #include <rtems/libio.h>
-#include <sys/stat.h>
 #endif
 
 #include <bsp.h>

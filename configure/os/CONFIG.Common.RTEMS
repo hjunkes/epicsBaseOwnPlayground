@@ -106,8 +106,10 @@ OS_API = $(firstword $(OS_API_$(RTEMS_SERIES)) posix)
 
 #--------------------------------------------------
 # Operating system flags
-OP_SYS_LDLIBS += -lrtemsCom -lc -lrtemscpu -lCom -lnfs -lm 
-# newest Rtems > 2019 needs this -ltftpfs
+OP_SYS_LDLIBS += -lrtemsCom -lc -lrtemscpu -lCom -lnfs -lm
+ifeq ($(RTEMS_SERIES),5)
+OP_SYS_LDLIBS += -ltftpfs
+endif
 
 OP_SYS_LDFLAGS_posix += -u POSIX_Init
 OP_SYS_LDFLAGS_kernel += $(CPU_CFLAGS) -u Init \
