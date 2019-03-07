@@ -54,11 +54,10 @@ then
   curl -L "https://github.com/mdavidsaver/rsb/releases/download/20171203-${RTEMS}/i386-rtems${RTEMS}-trusty-20171203-${RTEMS}.tar.bz2" \
   | tar -C / -xmj
 
-  sed -i -e '/^RTEMS_VERSION/d' -e '/^RTEMS_SERIES/d' -e '/^RTEMS_BASE/d' configure/os/CONFIG_SITE.Common.RTEMS
-RTEMS_SERIES="${RTEMS_SERIES%.*}"
+  sed -i "" -e '/^RTEMS_VERSION/d' -e '/^RTEMS_SERIES/d' -e '/^RTEMS_BASE/d' configure/os/CONFIG_SITE.Common.RTEMS
   cat << EOF >> configure/os/CONFIG_SITE.Common.RTEMS
 RTEMS_VERSION=$RTEMS
-RTEMS_SERIES=$RTEMS_SERIES
+RTEMS_SERIES="${RTEMS%.*}"
 RTEMS_BASE=$HOME/.rtems
 EOF
   cat << EOF >> configure/CONFIG_SITE
