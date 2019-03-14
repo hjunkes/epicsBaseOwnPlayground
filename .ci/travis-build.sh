@@ -53,7 +53,7 @@ then
   echo "Cross RTEMS${RTEMS} for pc386"
   if [ "$RTEMS" = "5" ]
   then 
-    curl -L "http://w10.rz-berlin.mpg.de/dwnld/rtems${RTEMS}-i368.tar.bz2" \
+    curl -L "https://dwnld.rz-berlin.mpg.de/rtems${RTEMS}-i368.tar.bz2" \
     | tar -C / -xmj
   else 
     curl -L "https://github.com/mdavidsaver/rsb/releases/download/20171203-${RTEMS}/i386-rtems${RTEMS}-trusty-20171203-${RTEMS}.tar.bz2" \
