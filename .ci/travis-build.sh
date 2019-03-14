@@ -51,7 +51,8 @@ fi
 if [ -n "$RTEMS" ]
 then
   echo "Cross RTEMS${RTEMS} for pc386"
-  if [[ "$RTEMS" == "5" ]]; then 
+  if [ "$RTEMS" = "5" ]
+  then 
     mkdir $HOME/RTEMS_DEV
     cd $HOME/RTEMS_DEV
     git clone git://git.rtems.org/rtems.git
