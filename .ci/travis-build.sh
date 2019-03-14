@@ -53,24 +53,8 @@ then
   echo "Cross RTEMS${RTEMS} for pc386"
   if [ "$RTEMS" = "5" ]
   then 
-    mkdir $HOME/RTEMS_DEV
-    cd $HOME/RTEMS_DEV
-    git clone git://git.rtems.org/rtems.git
-    git clone git://git.rtems.org/rtems-tools.git
-    git clone git://git.rtems.org/rtems-source-builder.git
-    cd rtems-tools
-    ./waf configure --prefix=$HOME/.rtems build install
-    cd ../rtems-source-builder/rtems/
-    ../source-builder/sb-set-builder --log log.i386.txt --prefix=$HOME/.rtems 5/rtems-i386
-    cd $HOME/RTEMS_DEV/rtems
-    ../rtems-source-builder/source-builder/sb-bootstrap
-    cd ..
-    mkdir -p build/b-i386
-    ../../rtems/configure --enable-maintainer-mode --prefix=${HOME}/.rtems \
-    --target=i386-rtems5 --enable-rtemsbsp="pc386" --enable-posix \
-    --enable-cxx --enable-networking
-    make all
-    make install
+    curl -L "http://w10.rz-berlin.mpg.de/dwnld/rtems${RTEMS}-i368.tar.bz2" \
+    | tar -C / -xmj
   else 
     curl -L "https://github.com/mdavidsaver/rsb/releases/download/20171203-${RTEMS}/i386-rtems${RTEMS}-trusty-20171203-${RTEMS}.tar.bz2" \
     | tar -C / -xmj
