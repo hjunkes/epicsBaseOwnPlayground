@@ -6,6 +6,7 @@ compiler:
 addons:
   apt:
     packages:
+    - texinfo
     - libreadline6-dev
     - libncurses5-dev
     - perl
