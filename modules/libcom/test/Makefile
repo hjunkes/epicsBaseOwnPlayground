@@ -99,10 +99,14 @@ epicsStringTest_SRCS += epicsStringTest.c
 testHarness_SRCS += epicsStringTest.c
 TESTS += epicsStringTest
 
+ifeq ($(RTEMS_SERIES),5)
+ifeq ($(findstring 386,$(T_A)),)
 TESTPROD_HOST += epicsTimeTest
 epicsTimeTest_SRCS += epicsTimeTest.cpp
 testHarness_SRCS += epicsTimeTest.cpp
 TESTS += epicsTimeTest
+endif
+endif
 
 TESTPROD_HOST += epicsTimeZoneTest
 epicsTimeZoneTest_SRCS += epicsTimeZoneTest.c
