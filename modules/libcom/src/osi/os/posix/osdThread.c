@@ -633,13 +633,13 @@ static epicsThreadOSD *createImplicit(void)
     pthreadInfo->osiPriority = 0;
 
 #if defined(_POSIX_THREAD_PRIORITY_SCHEDULING) && _POSIX_THREAD_PRIORITY_SCHEDULING > 0
-    status = pthread_getschedparam(tid,&pthreadInfo->schedPolicy,&pthreadInfo->schedParam);
-    checkStatus(status,"pthread_getschedparam createImplicit");
-    if ( 0 == status && pcommonAttr->valid && pcommonAttr->schedPolicy == pthreadInfo->schedPolicy ) {
-        pthreadInfo->osiPriority =
+    if(pthread_getschedparam(tid,&pthreadInfo->schedPolicy,&pthreadInfo->schedParam) == 0) {
+        if ( pcommonAttr->usePolicy && pthreadInfo->schedPolicy == pcommonAttr->schedPolicy ) {
+            pthreadInfo->osiPriority =
                  (pthreadInfo->schedParam.sched_priority - pcommonAttr->minPriority) * 100.0 /
                     (pcommonAttr->maxPriority - pcommonAttr->minPriority + 1);
-    }
+        }
+	}
 #endif /* _POSIX_THREAD_PRIORITY_SCHEDULING */
 
     status = pthread_setspecific(getpthreadInfo,(void *)pthreadInfo);

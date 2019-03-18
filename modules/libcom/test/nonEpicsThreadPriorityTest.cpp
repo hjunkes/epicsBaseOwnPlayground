@@ -1,13 +1,24 @@
-#include <pthread.h>
 #include <epicsThread.h>
 #include "epicsUnitTest.h"
 #include "testMain.h"
 #include <stdio.h>
 #include <string.h>
 
+#ifdef __rtems__
+
+/* RTEMS is posix but currently does not use the pthread API */
+MAIN(nonEpicsThreadPriorityTest)
+{
+    testPlan(1);
+    testSkip(1, "Platform does not use pthread API");
+    return testDone();
+}
+
+#else
+
 static void *nonEpicsTestFunc(void *arg)
 {
-unsigned int pri;
+    unsigned int pri;
     // epicsThreadGetIdSelf()  creates an EPICS context
     // verify that the priority computed by epics context
     // is OK
@@ -22,13 +33,13 @@ unsigned int pri;
 
 static void testFunc(void *arg)
 {
-epicsEventId        ev = (epicsEventId)arg;
-int                 policy;
-struct sched_param  param;
-int                 status;
-pthread_t           tid;
-void               *rval;
-pthread_attr_t      attr;
+    epicsEventId        ev = (epicsEventId)arg;
+    int                 policy;
+    struct sched_param  param;
+    int                 status;
+    pthread_t           tid;
+    void               *rval;
+    pthread_attr_t      attr;
 
     status = pthread_getschedparam(pthread_self(), &policy,&param);
     if ( status ) {
@@ -76,8 +87,7 @@ done:
 
 MAIN(nonEpicsThreadPriorityTest)
 {
-unsigned int pri;
-    testPlan(4);
+    testPlan(2);
     epicsEventId testComplete = epicsEventMustCreate(epicsEventEmpty);
     epicsThreadMustCreate("nonEpicsThreadPriorityTest", epicsThreadPriorityLow,
         epicsThreadGetStackSize(epicsThreadStackMedium),
@@ -85,14 +95,6 @@ unsigned int pri;
     epicsEventWaitStatus status = epicsEventWait(testComplete);
     testOk(status == epicsEventWaitOK,
         "epicsEventWait returned %d", status);
-    if ( epicsThreadBooleanStatusSuccess != epicsThreadHighestPriorityLevelBelow(48, &pri) ) {
-        testFail("epicsThreadHighestPriorityLevelBelow failed");
-    }
-    testOk(47 == pri, "epicsThreadHighestPriorityLevelBelow(48) = %d (!= 47)", pri);
-   	if ( epicsThreadBooleanStatusSuccess != epicsThreadLowestPriorityLevelAbove(47, &pri) ) {
-        testFail("epicsThreadLowestPriorityLevelAbove failed");
-    }
-    testOk(48 == pri, "epicsThreadLowestPriorityLevelAbove(47) = %d (!= 48)", pri);
- return testDone();
+    return testDone();
 }
-
+#endif
