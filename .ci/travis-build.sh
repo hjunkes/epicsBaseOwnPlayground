@@ -47,13 +47,13 @@ CROSS_COMPILER_TARGET_ARCHS+=win32-x86-mingw
 EOF
 fi
 
-# set RTEMS to eg. "4.9" or "4.10"
+# set RTEMS to eg. "4.9" or "4.10" or "5"
 if [ -n "$RTEMS" ]
 then
   echo "Cross RTEMS${RTEMS} for pc386"
   if [ "$RTEMS" = "5" ]
   then 
-    curl -L "https://dwnld.rz-berlin.mpg.de/rtems${RTEMS}-i368.tar.bz2" \
+    curl -L "https://dwnld.rz-berlin.mpg.de/rtems${RTEMS}-180319.tar.bz2" \
     | tar -C / -xmj
   else 
     curl -L "https://github.com/mdavidsaver/rsb/releases/download/20171203-${RTEMS}/i386-rtems${RTEMS}-trusty-20171203-${RTEMS}.tar.bz2" \
