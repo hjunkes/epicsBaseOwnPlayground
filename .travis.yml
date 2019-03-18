@@ -12,6 +12,7 @@ addons:
     - clang
     - g++-mingw-w64-i686
     - qemu-system-x86
+    - qemu-system-arm
 script:
   - .ci/travis-build.sh
 env:
