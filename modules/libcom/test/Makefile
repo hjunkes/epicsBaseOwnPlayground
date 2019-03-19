@@ -100,14 +100,19 @@ testHarness_SRCS += epicsStringTest.c
 TESTS += epicsStringTest
 
 ifeq ($(RTEMS_SERIES),5)
-ifeq ($(findstring 386,$(T_A)),)
+ifeq ($(findstring 386,$(T_A)),386)
+epicsRunLibComTests_CFLAGS += -DNOT_ON_RTEMS_386
+else
 TESTPROD_HOST += epicsTimeTest
 epicsTimeTest_SRCS += epicsTimeTest.cpp
 testHarness_SRCS += epicsTimeTest.cpp
 TESTS += epicsTimeTest
-else
-epicsRunLibComTests_CFLAGS += -DNOT_ON_RTEMS_386
 endif
+else
+TESTPROD_HOST += epicsTimeTest
+epicsTimeTest_SRCS += epicsTimeTest.cpp
+testHarness_SRCS += epicsTimeTest.cpp
+TESTS += epicsTimeTest
 endif
 
 TESTPROD_HOST += epicsTimeZoneTest
