@@ -43,7 +43,9 @@ int epicsThreadPriorityTest(void);
 int epicsThreadPrivateTest(void);
 int epicsThreadTest(void);
 int epicsTimerTest(void);
+#ifndef NOT_ON_RTEMS_386
 int epicsTimeTest(void);
+#endif
 #ifdef __rtems__
 int epicsTimeZoneTest(void);
 #endif
@@ -52,11 +54,9 @@ int epicsInlineTest(void);
 int ipAddrToAsciiTest(void);
 int macDefExpandTest(void);
 int macLibTest(void);
-/*
-#if __RTEMS_MAJOR__>4
+#ifdef HAVE_PTHREAD_PRIORITY_SCHEDULING
 int nonEpicsThreadPriorityTest(void);
 #endif
-*/
 int osiSockTest(void);
 int ringBytesTest(void);
 int ringPointerTest(void);
@@ -104,7 +104,9 @@ void epicsRunLibComTests(void)
     runTest(epicsThreadPoolTest);
     runTest(epicsThreadPriorityTest);
     runTest(epicsThreadPrivateTest);
+#ifndef NOT_ON_RTEMS_386
     runTest(epicsTimeTest);
+#endif
 #ifdef __rtems__
     runTest(epicsTimeZoneTest);
 #endif
@@ -112,11 +114,9 @@ void epicsRunLibComTests(void)
     runTest(ipAddrToAsciiTest);
     runTest(macDefExpandTest);
     runTest(macLibTest);
-/*
-#if __RTEMS_MAJOR__>4
+#ifdef HAVE_PTHREAD_PRIORITY_SCHEDULING
     runTest(nonEpicsThreadPriorityTest);
 #endif
-*/
     runTest(osiSockTest);
     runTest(ringBytesTest);
     runTest(ringPointerTest);

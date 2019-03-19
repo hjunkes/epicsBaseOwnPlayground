@@ -105,6 +105,8 @@ TESTPROD_HOST += epicsTimeTest
 epicsTimeTest_SRCS += epicsTimeTest.cpp
 testHarness_SRCS += epicsTimeTest.cpp
 TESTS += epicsTimeTest
+else
+epicsRunLibComTests_CFLAGS += -DNOT_ON_RTEMS_386
 endif
 endif
 
