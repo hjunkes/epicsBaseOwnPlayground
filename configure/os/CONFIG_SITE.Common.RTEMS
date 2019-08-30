@@ -22,7 +22,7 @@
 # FHI:
 RTEMS_SERIES = 5
 RTEMS_VERSION = 5
-RTEMS_BASE = /Users/junkes/RTEMS_POST_AUSTRALIA/RTEMS/rtems-$(RTEMS_VERSION)
+RTEMS_BASE = /home/h1/.rtems
 
 # Cross-compile toolchain in $(RTEMS_TOOLS)/bin
 #

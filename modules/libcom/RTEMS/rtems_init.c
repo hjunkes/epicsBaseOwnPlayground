@@ -37,6 +37,9 @@
 #include <signal.h>
 #include <sched.h>
 #include <rtems/libio.h>
+#include <rtems/telnetd.h>
+#include <epicsStdio.h>
+#include <epicsReadline.h>
 #endif
 
 #include <bsp.h>
@@ -146,6 +149,66 @@ mustMalloc(int size, const char *msg)
     return p;
 }
 
+#if __RTEMS_MAJOR__>4
+/*
+ ***********************************************************************
+ *                         TELNET DAEMON                               *
+ ***********************************************************************
+ */
+#define LINE_SIZE 256
+static void
+telnet_pseudoIocsh(char *name, void *arg)
+{
+  char line[LINE_SIZE];
+  int fid[3], save_fid[3];
+
+  printf("info:  pty dev name = %s\n", name);
+
+  save_fid[1] = dup2(1,1);
+  fid[1] = dup2( fileno(stdout), 1);
+  if (fid[1] == -1 ) printf("Can't dup stdout\n");
+  save_fid[2] = dup2(2,2);
+  fid[2] = dup2( fileno(stderr), 2);
+  if (fid[2] == -1 ) printf("Can't dup stderr\n");
+    
+  const char *prompt = "tIocSh> ";
+
+  while (1) {
+    fputs(prompt, stdout);
+    fflush(stdout);
+    /* telnet close not detected ??? tbd */
+    if (fgets(line, LINE_SIZE, stdin) == NULL) {
+      dup2(save_fid[1],1);
++     dup2(save_fid[2],2);
+      return;
+    }
+    if (line[strlen(line)-1] == '\n') line[strlen(line)-1] = 0;
+    if (!strncmp( line, "bye",3)) {
+      printf( "%s", "Will end session\n");
+      dup2(save_fid[1],1);
+      dup2(save_fid[2],2);
+      return;                                                                                                     
+     }
+     iocshCmd(line);
+   }
+}
+
+#define SHELL_ENTRY telnet_pseudoIocsh
+
+/*
+ *  Telnet daemon configuration
+ */
+rtems_telnetd_config_table rtems_telnetd_config = {
+  .command = SHELL_ENTRY,
+  .arg = NULL,
+  .priority = 99, // if RTEMS_NETWORK and .priority == 0 bsd_network_prio should be used ...
+  .stack_size = 0,
+  .client_maximum = 5, // should be 1, on RTEMS and Epics it makes only sense for one connection a time
+  .login_check = NULL,
+  .keep_stdio = false
+};
+
+#endif
 /*
  ***********************************************************************
  *                         REMOTE FILE ACCESS                          *
@@ -796,10 +859,21 @@ Init (rtems_task_argument ignored)
     osdTimeRegister();
 #endif
 
+#if __RTEMS_MAJOR__>4
+    // if telnetd is requested ...
+    printf(" Will try to start telnetd with prio %d ...\n", rtems_telnetd_config.priority);
+    result = rtems_telnetd_initialize();
+    printf (" telnetd initialized with result %d\n", result);
+#endif
+
     /*
      * Run the EPICS startup script
      */
+    printf("stdin: fileno: %d, ttyname: %s\n", fileno(stdin),ttyname(fileno(stdin)));
+    printf("stdout: fileno: %d, ttyname: %s\n", fileno(stdout),ttyname(fileno(stdout)));
+    printf("stderr: fileno: %d, ttyname: %s\n", fileno(stderr),ttyname(fileno(stderr)));
     printf ("***** Preparing EPICS application *****\n");
+
     iocshRegisterRTEMS ();
     set_directory (argv[1]);
     epicsEnvSet ("IOC_STARTUP_SCRIPT", argv[1]);
@@ -859,8 +933,8 @@ int cexpdebug __attribute__((weak));
 #define CONFIGURE_SHELL_COMMANDS_INIT
 #define CONFIGURE_SHELL_COMMANDS_ALL
 // exclude commands which won't work right with our configuration
-#define CONFIGURE_SHELL_NO_COMMAND_EXIT
-#define CONFIGURE_SHELL_NO_COMMAND_LOGOFF
+//#define CONFIGURE_SHELL_NO_COMMAND_EXIT
+//#define CONFIGURE_SHELL_NO_COMMAND_LOGOFF
 // exclude commands which unnecessarily pull in block driver
 #define CONFIGURE_SHELL_NO_COMMAND_MSDOSFMT
 #define CONFIGURE_SHELL_NO_COMMAND_BLKSYNC
