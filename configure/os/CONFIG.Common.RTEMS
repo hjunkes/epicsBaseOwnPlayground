@@ -119,7 +119,7 @@ OP_SYS_LDFLAGS_kernel += $(CPU_CFLAGS) -u Init \
                  $(PROJECT_RELEASE)/lib/no-signal.rel \
                  $(PROJECT_RELEASE)/lib/no-rtmon.rel
 
-OP_SYS_LDFLAGS += $(CPU_FLAGS) $(OP_SYS_LDFLAGS_$(OS_API))
+OP_SYS_LDFLAGS += $(CPU_CFLAGS) $(OP_SYS_LDFLAGS_$(OS_API))
 MOD_SYS_LDFLAGS += $(CPU_CFLAGS) -Wl,-r -nostdlib
 
 # Do not link against libraries which are part of the Generic Image

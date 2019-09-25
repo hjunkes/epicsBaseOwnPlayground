@@ -18,7 +18,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <unistd.h>
-#include <termios.h>
+#include <sys/termios.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/socket.h>
@@ -30,18 +30,7 @@
 #include <rtems/stackchk.h>
 #include <rtems/rtems_bsdnet.h>
 #include <rtems/imfs.h>
-#include <rtems/shell.h>
 #include <librtemsNfs.h>
-#if __RTEMS_MAJOR__>4
-#include <pthread.h>
-#include <signal.h>
-#include <sched.h>
-#include <rtems/libio.h>
-#include <rtems/telnetd.h>
-#include <epicsStdio.h>
-#include <epicsReadline.h>
-#endif
-
 #include <bsp.h>
 
 #include "epicsVersion.h"
@@ -94,14 +83,9 @@ logReset (void)
 static void
 delayedPanic (const char *msg)
 {
-#if __RTEMS_MAJOR__>4
-    rtems_task_wake_after (rtems_clock_get_ticks_per_second());
-    rtems_task_wake_after (rtems_clock_get_ticks_per_second());
-#else
     extern rtems_interval rtemsTicksPerSecond;
 
     rtems_task_wake_after (rtemsTicksPerSecond);
-#endif
     rtems_panic (msg);
 }
 
@@ -149,66 +133,6 @@ mustMalloc(int size, const char *msg)
     return p;
 }
 
-#if __RTEMS_MAJOR__>4
-/*
- ***********************************************************************
- *                         TELNET DAEMON                               *
- ***********************************************************************
- */
-#define LINE_SIZE 256
-static void
-telnet_pseudoIocsh(char *name, void *arg)
-{
-  char line[LINE_SIZE];
-  int fid[3], save_fid[3];
-
-  printf("info:  pty dev name = %s\n", name);
-
-  save_fid[1] = dup2(1,1);
-  fid[1] = dup2( fileno(stdout), 1);
-  if (fid[1] == -1 ) printf("Can't dup stdout\n");
-  save_fid[2] = dup2(2,2);
-  fid[2] = dup2( fileno(stderr), 2);
-  if (fid[2] == -1 ) printf("Can't dup stderr\n");
-    
-  const char *prompt = "tIocSh> ";
-
-  while (1) {
-    fputs(prompt, stdout);
-    fflush(stdout);
-    /* telnet close not detected ??? tbd */
-    if (fgets(line, LINE_SIZE, stdin) == NULL) {
-      dup2(save_fid[1],1);
-+     dup2(save_fid[2],2);
-      return;
-    }
-    if (line[strlen(line)-1] == '\n') line[strlen(line)-1] = 0;
-    if (!strncmp( line, "bye",3)) {
-      printf( "%s", "Will end session\n");
-      dup2(save_fid[1],1);
-      dup2(save_fid[2],2);
-      return;                                                                                                     
-     }
-     iocshCmd(line);
-   }
-}
-
-#define SHELL_ENTRY telnet_pseudoIocsh
-
-/*
- *  Telnet daemon configuration
- */
-rtems_telnetd_config_table rtems_telnetd_config = {
-  .command = SHELL_ENTRY,
-  .arg = NULL,
-  .priority = 99, // if RTEMS_NETWORK and .priority == 0 bsd_network_prio should be used ...
-  .stack_size = 0,
-  .client_maximum = 5, // should be 1, on RTEMS and Epics it makes only sense for one connection a time
-  .login_check = NULL,
-  .keep_stdio = false
-};
-
-#endif
 /*
  ***********************************************************************
  *                         REMOTE FILE ACCESS                          *
@@ -294,13 +218,6 @@ nfsMount(char *uidhost, char *path, char *mntpoint)
     }
     sprintf(dev, "%s:%s", uidhost, path);
     printf("Mount %s on %s\n", dev, mntpoint);
-#if __RTEMS_MAJOR__>4
-   rval = mount_and_make_target_path (
-        dev, mntpoint, RTEMS_FILESYSTEM_TYPE_NFS,
-        RTEMS_FILESYSTEM_READ_WRITE, NULL );
-   if(rval)
-      perror("mount failed");
-#else
     if (rtems_mkdir(mntpoint, S_IRWXU | S_IRWXG | S_IRWXO))
         printf("Warning -- unable to make directory \"%s\"\n", mntpoint);
     if (mount(dev, mntpoint, RTEMS_FILESYSTEM_TYPE_NFS,
@@ -310,7 +227,6 @@ nfsMount(char *uidhost, char *path, char *mntpoint)
     else {
         rval = 0;
     }
-#endif
     free(dev);
     return rval;
 }
@@ -319,7 +235,6 @@ nfsMount(char *uidhost, char *path, char *mntpoint)
 #define NFS_INIT    rpcUdpInit(); nfsInit(0,0);
 #endif
 #endif
-
 
 static void
 initialize_remote_filesystem(char **argv, int hasLocalFilesystem)
@@ -428,8 +343,7 @@ initialize_remote_filesystem(char **argv, int hasLocalFilesystem)
                 if ( scanfStatus ==  2 ) {
                     pServerPath[0u]= '/';
                     server_name = pServerName;
-                    // is this a general solution?
-                    server_path = mount_point = pServerPath;
+                    server_path = pServerPath;
                 }
                 else {
                     free ( pServerName );
@@ -531,30 +445,6 @@ set_directory (const char *commandline)
  *                         RTEMS/EPICS COMMANDS                        *
  ***********************************************************************
  */
-
-static const iocshArg rtshellArg0 = { "cmd", iocshArgString};
-static const iocshArg rtshellArg1 = { "args", iocshArgArgv};
-static const iocshArg * rtshellArgs[2] = { &rtshellArg0, &rtshellArg1};
-static const iocshFuncDef rtshellFuncDef = { "rt",2, rtshellArgs};
-static void rtshellCallFunc(const iocshArgBuf *args)
-{
-    rtems_shell_cmd_t *cmd = rtems_shell_lookup_cmd(args[0].sval);
-    int ret;
-    
-    if (!cmd) {
-        fprintf(stderr, "ERR: No such command\n");
-    
-    } else {
-        fflush(stdout);
-        fflush(stderr);
-        ret = (*cmd->command)(args[1].aval.ac,args[1].aval.av);
-        fflush(stdout);
-        fflush(stderr);
-        if(ret)
-            fprintf(stderr, "ERR: %d\n",ret);
-    }
-}
-
 /*
  * RTEMS status
  */
@@ -585,20 +475,11 @@ static void netStatCallFunc(const iocshArgBuf *args)
 static const iocshFuncDef heapSpaceFuncDef = {"heapSpace",0,NULL};
 static void heapSpaceCallFunc(const iocshArgBuf *args)
 {
-#if __RTEMS_MAJOR__>4
-    Heap_Information_block info;
-    double x;
-
-    malloc_info (&info);
-    x = info.Stats.size - (unsigned long)
-        (info.Stats.lifetime_allocated - info.Stats.lifetime_freed);
-#else
     rtems_malloc_statistics_t s;
     double x;
 
     malloc_get_statistics(&s);
     x = s.space_available - (unsigned long)(s.lifetime_allocated - s.lifetime_freed);
-#endif
     if (x >= 1024*1024)
         printf("Heap space: %.1f MB\n", x / (1024 * 1024));
     else
@@ -628,25 +509,6 @@ static void nfsMountCallFunc(const iocshArgBuf *args)
 }
 #endif
 
-
-void zoneset(const char *zone)
-{
-    if(zone)
-        setenv("TZ", zone, 1);
-    else
-        unsetenv("TZ");
-    tzset();
-}
-
-static const iocshArg zonesetArg0 = {"zone string", iocshArgString};
-static const iocshArg * const zonesetArgs[1] = {&zonesetArg0};
-static const iocshFuncDef zonesetFuncDef = {"zoneset",1,zonesetArgs};
-static void zonesetCallFunc(const iocshArgBuf *args)
-{
-    zoneset(args[0].sval);
-}
-
-
 /*
  * Register RTEMS-specific commands
  */
@@ -656,15 +518,6 @@ static void iocshRegisterRTEMS (void)
     iocshRegister(&heapSpaceFuncDef, heapSpaceCallFunc);
 #ifndef OMIT_NFS_SUPPORT
     iocshRegister(&nfsMountFuncDef, nfsMountCallFunc);
-#endif
-    iocshRegister(&zonesetFuncDef, &zonesetCallFunc);
-    iocshRegister(&rtshellFuncDef, &rtshellCallFunc);
-    
-#if __RTEMS_MAJOR__<5
-    void rtems_shell_initialize_command_set(void);
-    rtems_shell_initialize_command_set();
-#else
-    rtems_shell_init_environment();
 #endif
 }
 
@@ -687,7 +540,6 @@ initConsole (void)
     }
 }
 
-#if __RTEMS_MAJOR__<5
 /*
  * Ensure that the configuration object files
  * get pulled in from the library
@@ -698,7 +550,7 @@ const void *rtemsConfigArray[] = {
     &Configuration,
     &rtems_bsdnet_config
 };
-#endif
+
 /*
  * Hook to ensure that BSP cleanup code gets run on exit
  */
@@ -711,20 +563,13 @@ exitHandler(void)
 /*
  * RTEMS Startup task
  */
-#if __RTEMS_MAJOR__>4
-void *
-POSIX_Init (void *argument)
-#else
 rtems_task
 Init (rtems_task_argument ignored)
-#endif
-  {
+{
     int                 result;
     char               *argv[3]         = { NULL, NULL, NULL };
     char               *cp;
-#if __RTEMS_MAJOR__<5
     rtems_task_priority newpri;
-#endif
     rtems_status_code   sc;
     rtems_time_of_day   now;
 
@@ -745,21 +590,13 @@ Init (rtems_task_argument ignored)
     if (epicsRtemsInitPostSetBootConfigFromNVRAM(&rtems_bsdnet_config) != 0)
         delayedPanic("epicsRtemsInitPostSetBootConfigFromNVRAM");
 
-#if __RTEMS_MAJOR__>4
-
     /*
-     * Override RTEMS Posix configuration, starts with posix prio 2
-     */
-    epicsThreadSetPriority(epicsThreadGetIdSelf(), epicsThreadPriorityIocsh);
-#else
-     /*
      * Override RTEMS configuration
      */
     rtems_task_set_priority (
-      RTEMS_SELF,
-      epicsThreadGetOssPriorityValue(epicsThreadPriorityIocsh),
-      &newpri);
-#endif
+                     RTEMS_SELF,
+                     epicsThreadGetOssPriorityValue(epicsThreadPriorityIocsh),
+                     &newpri);
 
     /*
      * Create a reasonable environment
@@ -785,14 +622,10 @@ Init (rtems_task_argument ignored)
         if (epicsThreadHighestPriorityLevelBelow(epicsThreadPriorityScanLow, &p)
                                             == epicsThreadBooleanStatusSuccess)
         {
-#if __RTEMS_MAJOR__>4
-            rtems_bsdnet_config.network_task_priority = 255 - p; //it's the RTEMS prio, check check ...
-#else
             rtems_bsdnet_config.network_task_priority = epicsThreadGetOssPriorityValue(p);
-#endif
         }
     }
-    printf("\n***** Initializing network (network_task_priority = %u) *****\n", rtems_bsdnet_config.network_task_priority );
+    printf("\n***** Initializing network *****\n");
     rtems_bsdnet_initialize_network();
     printf("\n***** Setting up file system *****\n");
     initialize_remote_filesystem(argv, initialize_local_filesystem(argv));
@@ -815,11 +648,7 @@ Init (rtems_task_argument ignored)
      * It is very likely that other time synchronization facilities in EPICS
      * will soon override this value.
      */
-#if __RTEMS_MAJOR__>4
-    if (rtems_clock_get_tod(&now) != RTEMS_SUCCESSFUL) {
-#else
     if (rtems_clock_get(RTEMS_CLOCK_GET_TOD,&now) != RTEMS_SUCCESSFUL) {
-#endif
         now.year = 2001;
         now.month = 1;
         now.day = 1;
@@ -852,28 +681,12 @@ Init (rtems_task_argument ignored)
         }
     }
     tzset();
-#if __RTEMS_MAJOR__>4
-    printf(" check for time registered , C++ initialization ...\n");
-    // timeRegister();
-#else
     osdTimeRegister();
-#endif
-
-#if __RTEMS_MAJOR__>4
-    // if telnetd is requested ...
-    printf(" Will try to start telnetd with prio %d ...\n", rtems_telnetd_config.priority);
-    result = rtems_telnetd_initialize();
-    printf (" telnetd initialized with result %d\n", result);
-#endif
 
     /*
      * Run the EPICS startup script
      */
-    printf("stdin: fileno: %d, ttyname: %s\n", fileno(stdin),ttyname(fileno(stdin)));
-    printf("stdout: fileno: %d, ttyname: %s\n", fileno(stdout),ttyname(fileno(stdout)));
-    printf("stderr: fileno: %d, ttyname: %s\n", fileno(stderr),ttyname(fileno(stderr)));
     printf ("***** Preparing EPICS application *****\n");
-
     iocshRegisterRTEMS ();
     set_directory (argv[1]);
     epicsEnvSet ("IOC_STARTUP_SCRIPT", argv[1]);
@@ -884,9 +697,6 @@ Init (rtems_task_argument ignored)
     printf ("***** IOC application terminating *****\n");
     epicsThreadSleep(1.0);
     epicsExit(result);
-#if __RTEMS_MAJOR__>4
-    return NULL;
-#endif
 }
 
 #if defined(QEMU_FIXUPS)
@@ -898,17 +708,10 @@ Init (rtems_task_argument ignored)
 /* Ensure that stdio goes to serial (so it can be captured) */
 #if defined(__i386__) && !USE_COM1_AS_CONSOLE
 #include <uart.h>
-#if __RTEMS_MAJOR__>4
-#include <libchip/serial.h>
-#endif
 extern int BSPPrintkPort;
 void bsp_predriver_hook(void)
 {
-#if __RTEMS_MAJOR__>4
-    Console_Port_Minor = BSP_CONSOLE_PORT_COM1;
-#else
     BSPConsolePort = BSP_CONSOLE_PORT_COM1;
-#endif
     BSPPrintkPort = BSP_CONSOLE_PORT_COM1;
 }
 #endif
@@ -929,17 +732,3 @@ void bsp_cleanup(void)
 #endif /* QEMU_FIXUPS */
 
 int cexpdebug __attribute__((weak));
-
-#define CONFIGURE_SHELL_COMMANDS_INIT
-#define CONFIGURE_SHELL_COMMANDS_ALL
-// exclude commands which won't work right with our configuration
-//#define CONFIGURE_SHELL_NO_COMMAND_EXIT
-//#define CONFIGURE_SHELL_NO_COMMAND_LOGOFF
-// exclude commands which unnecessarily pull in block driver
-#define CONFIGURE_SHELL_NO_COMMAND_MSDOSFMT
-#define CONFIGURE_SHELL_NO_COMMAND_BLKSYNC
-#define CONFIGURE_SHELL_NO_COMMAND_MKRFS
-#define CONFIGURE_SHELL_NO_COMMAND_DEBUGRFS
-#define CONFIGURE_SHELL_NO_COMMAND_FDISK
-
-#include <rtems/shellconfig.h>
