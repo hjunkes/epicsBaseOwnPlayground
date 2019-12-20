@@ -106,10 +106,12 @@ OS_API = $(firstword $(OS_API_$(RTEMS_SERIES)) posix)
 
 #--------------------------------------------------
 # Operating system flags
-OP_SYS_LDLIBS += -lrtemsCom -lc -lrtemscpu -lCom -lnfs -lm
-ifeq ($(RTEMS_SERIES),5)
-OP_SYS_LDLIBS += -ltftpfs -ltelnetd
-endif
+#OP_SYS_LDLIBS += -lrtemsCom -lc -lrtemscpu -lCom -lnfs -lm
+OP_SYS_LDLIBS += -lrtemsCom -lrtemscpu -lrtemsbsp
+#ifeq ($(RTEMS_SERIES),5)
+OP_SYS_CFLAGS += -D__LINUX_ERRNO_EXTENSIONS__
+OP_SYS_LDLIBS += -ltftpfs -ltelnetd -lbsd -lc
+#endif
 
 OP_SYS_LDFLAGS_posix += -u POSIX_Init
 OP_SYS_LDFLAGS_kernel += $(CPU_CFLAGS) -u Init \

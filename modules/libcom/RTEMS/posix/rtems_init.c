@@ -35,7 +35,10 @@
 #include <signal.h>
 #include <sched.h>
 #include <rtems/libio.h>
+#include <rtems/bsd/bsd.h>
+#include <rtems/dhcpcd.h>
 #include <rtems/rtems_bsdnet.h>
+#include <rtems/telnetd.h>
 
 #include <bsp.h>
 
@@ -54,6 +57,16 @@
 #include "epicsRtemsInitHooks.h"
 
 #define RTEMS_VERSION_INT  VERSION_INT(__RTEMS_MAJOR__, __RTEMS_MINOR__, 0, 0)
+
+/* in configure ??? */
+//#define NET_CFG_INTERFACE_0 "tsec0"
+#define DEFAULT_NETWORK_DHCPCD_ENABLE
+#define DEFAULT_NETWORK_NO_INTERFACE_0
+
+struct in_addr rtems_bsdnet_bootp_server_address;
+char *rtems_bsdnet_bootp_server_name = "1001.1001@141.14.128.9:/export/epics";
+char *rtems_bsdnet_bootp_boot_file_name = "/export/epics/felsis3316/bin/RTEMS-beatnik/felsis3316.boot";
+char *rtems_bsdnet_bootp_cmdline = "/export/epics/felsis3316/iocBoot/iocfelsis3316/st.cmd";
 
 /*
  * Prototypes for some functions not in header files
@@ -302,6 +315,7 @@ initialize_remote_filesystem(char **argv, int hasLocalFilesystem)
             LogFatal("\"%s\" is not a valid command pathname.\n", rtems_bsdnet_bootp_cmdline);
         cp = mustMalloc(l + 20, "NFS mount paths");
         server_path = cp;
+printf( " bootp_server_name: %s\n",rtems_bsdnet_bootp_server_name);
         server_name = rtems_bsdnet_bootp_server_name;
         if (rtems_bsdnet_bootp_cmdline[0] == '/') {
             mount_point = server_path;
@@ -467,6 +481,7 @@ static void rtshellCallFunc(const iocshArgBuf *args)
 static void
 rtems_netstat (unsigned int level)
 {
+/*
     rtems_bsdnet_show_if_stats ();
     rtems_bsdnet_show_mbuf_stats ();
     if (level >= 1) {
@@ -478,6 +493,7 @@ rtems_netstat (unsigned int level)
         rtems_bsdnet_show_udp_stats ();
         rtems_bsdnet_show_tcp_stats ();
     }
+*/
 }
 
 static const iocshArg netStatArg0 = { "level",iocshArgInt};
@@ -589,6 +605,90 @@ exitHandler(void)
 }
 
 /*
+ * Dhcp hooks ???
+
+static void
+dhcpcd_hook_handler(rtems_dhcpcd_hook *hook, char *const *env)
+{
+char *ip_address;
+char *subnet_cidr;
+char *network_number;
+char *filename;
+char *server_name;
+
+  char *p;
+        (void)hook;
+
+        while (*env != NULL) {
+                // printf("%s\n", *env);
+p = strtok(*env,"=");
+
+if (!(strcmp(p,"ip_address"))) ip_address = strtok(NULL,"=");
+else if (!(strcmp(p,"subnet_cidr"))) subnet_cidr = strtok(NULL,"=");
+else if (!(strcmp(p,"network_number"))) network_number = strtok(NULL,"=");
+else if (!(strcmp(p,"filename"))) filename = strtok(NULL,"=");
+else if (!(strcmp(p,"server_name"))) server_name = strtok(NULL,"=");
+
+if (!strcmp(p,"reason")) {
+	printf(" p = %s\n",p);
+	p = strtok(NULL,"=");
+if (!strcmp(p,"BOUND")) {
+
+printf(" ip_address = %s\n", ip_address);
+printf(" subnet_cidr = %s\n", subnet_cidr);
+printf(" network_number = %s\n", network_number);
+printf(" filename = %s\n", filename);
+printf(" server_name = %s\n", server_name);
+
+
+dhcpcd_dhcp_printoptions();
+}
+
+}
+                ++env;
+        }
+}
+
+static rtems_dhcpcd_hook dhcpcd_hook = {
+        .name = "test",
+        .handler = dhcpcd_hook_handler
+};
+
+*/
+
+static void
+default_network_dhcpcd(void)
+{
+#ifdef DEFAULT_NETWORK_DHCPCD_ENABLE
+        static const char default_cfg[] = "clientid libbsd test client\n";
+        rtems_status_code sc;
+        int fd;
+        int rv;
+        ssize_t n;
+
+        fd = open("/etc/dhcpcd.conf", O_CREAT | O_WRONLY,
+            S_IRWXU | S_IRWXG | S_IRWXO);
+        assert(fd >= 0);
+
+        n = write(fd, default_cfg, sizeof(default_cfg) - 1);
+        assert(n == (ssize_t) sizeof(default_cfg) - 1);
+
+#ifdef DEFAULT_NETWORK_DHCPCD_NO_DHCP_DISCOVERY
+        static const char nodhcp_cfg[] = "nodhcp\nnodhcp6\n";
+
+        n = write(fd, nodhcp_cfg, sizeof(nodhcp_cfg) - 1);
+        assert(n == (ssize_t) sizeof(nodhcp_cfg) - 1);
+#endif
+
+        rv = close(fd);
+        assert(rv == 0);
+
+        sc = rtems_dhcpcd_start(NULL);
+        assert(sc == RTEMS_SUCCESSFUL);
+#endif
+}
+
+/*
  * RTEMS Startup task
  */
 void *
@@ -599,6 +699,7 @@ POSIX_Init (void *argument)
     char               *cp;
     rtems_status_code   sc;
     rtems_time_of_day   now;
+
 
     /*
      * Explain why we're here
@@ -635,10 +736,33 @@ POSIX_Init (void *argument)
      */
     printf("\n***** RTEMS Version: %s *****\n",
         rtems_get_version_string());
+      
+    printf("\n***** Initializing network (dhcp) *****\n");
+
+printf(" .... bsd initialize ....\n");
+      rtems_bsd_initialize();
+printf(" .... bsd ifconfig_lo0 ....\n");
+    rtems_bsd_ifconfig_lo0();
+
+    default_network_dhcpcd();
+epicsThreadSleep(15.0);
+
+/*
+ * Diagnostics
+
+rtems_bsdnet_show_inet_routes ();
+rtems_bsdnet_show_mbuf_stats ();
+rtems_bsdnet_show_if_stats ();
+rtems_bsdnet_show_ip_stats ();
+rtems_bsdnet_show_icmp_stats ();
+rtems_bsdnet_show_udp_stats ();
+rtems_bsdnet_show_tcp_stats ();
+*/
+
+
 
     /*
      * Start network
-     */
     if ((cp = getenv("EPICS_TS_NTP_INET")) != NULL)
         rtems_bsdnet_config.ntp_server[0] = cp;
     if (rtems_bsdnet_config.network_task_priority == 0)
@@ -650,8 +774,11 @@ POSIX_Init (void *argument)
             rtems_bsdnet_config.network_task_priority = 255 - p; //it's the RTEMS prio, check check ...
         }
     }
-    printf("\n***** Initializing network (network_task_priority = %u) *****\n", rtems_bsdnet_config.network_task_priority );
-    rtems_bsdnet_initialize_network();
+     */
+// rtems_bsdnet_synchronize_ntp (600, 150);
+//    printf("\n***** Initializing network (network_task_priority = %u) *****\n", rtems_bsdnet_config.network_task_priority );
+//    rtems_bsdnet_initialize_network();
+
     printf("\n***** Setting up file system *****\n");
     initialize_remote_filesystem(argv, initialize_local_filesystem(argv));
     fixup_hosts();

@@ -23,3 +23,8 @@ DIRS += modules
 modules_DEPEND_DIRS = src
 
 include $(TOP)/configure/RULES_TOP
+
+#all:
+#	scp bin/RTEMS-qoriq_e500/*.img root@epics:/srv/tftp
+#	rm -rf bin/RTEMS-qoriq_e500/*
+#	rm -rf lib/RTEMS-qoriq_e500/*

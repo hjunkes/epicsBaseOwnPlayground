@@ -22,7 +22,7 @@
 # FHI:
 RTEMS_SERIES = 5
 RTEMS_VERSION = 5
-RTEMS_BASE = /Users/junkes/MVME6100/RTEMS/rtems-$(RTEMS_VERSION)
+RTEMS_BASE = /Users/junkes/MVME2500/RTEMS/rtems-$(RTEMS_VERSION)
 
 # Cross-compile toolchain in $(RTEMS_TOOLS)/bin
 #
